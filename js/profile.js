@@ -24,7 +24,7 @@ const pointer = {
 };
 
 const swipeTrail = [];
-const TRAIL_MAX = IS_MOBILE ? 80 : 0;
+const TRAIL_MAX = IS_MOBILE ? 120 : 0;
 
 // Blob class: liquid-like circle
 class Blob {
@@ -135,12 +135,23 @@ function initBlobs(width, height) {
   }
 }
 
-function addTrailPoint(x, y, vx, vy) {
+function addTrailSegment(prevX, prevY, x, y, vx, vy) {
   if (!IS_MOBILE) return;
+  const dx = x - prevX;
+  const dy = y - prevY;
+  const distance = Math.hypot(dx, dy);
+  const steps = Math.min(8, Math.max(1, Math.ceil(distance / 12)));
   const speed = Math.hypot(vx, vy);
-  const radius = Math.min(140, 60 + speed * 1.6);
-  swipeTrail.push({ x, y, r: radius, life: 1 });
-  if (swipeTrail.length > TRAIL_MAX) {
+  const radius = Math.min(180, 70 + speed * 2.0);
+
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const ix = prevX + dx * t;
+    const iy = prevY + dy * t;
+    swipeTrail.push({ x: ix, y: iy, r: radius, life: 1 });
+  }
+
+  while (swipeTrail.length > TRAIL_MAX) {
     swipeTrail.shift();
   }
 }
@@ -150,14 +161,16 @@ function updatePointer(event) {
   const newX = event.clientX - rect.left;
   const newY = event.clientY - rect.top;
 
-  pointer.vx = newX - pointer.x;
-  pointer.vy = newY - pointer.y;
-  pointer.lastX = pointer.x;
-  pointer.lastY = pointer.y;
+  const prevX = pointer.x;
+  const prevY = pointer.y;
+  pointer.vx = newX - prevX;
+  pointer.vy = newY - prevY;
+  pointer.lastX = prevX;
+  pointer.lastY = prevY;
   pointer.x = newX;
   pointer.y = newY;
   pointer.active = true;
-  addTrailPoint(pointer.x, pointer.y, pointer.vx, pointer.vy);
+  addTrailSegment(prevX, prevY, pointer.x, pointer.y, pointer.vx, pointer.vy);
 }
 
 function fadePointer() {
@@ -172,43 +185,45 @@ function updatePointerTouch(event) {
   const newX = event.touches[0].clientX - rect.left;
   const newY = event.touches[0].clientY - rect.top;
 
-  pointer.vx = newX - pointer.x;
-  pointer.vy = newY - pointer.y;
-  pointer.lastX = pointer.x;
-  pointer.lastY = pointer.y;
+  const prevX = pointer.x;
+  const prevY = pointer.y;
+  pointer.vx = newX - prevX;
+  pointer.vy = newY - prevY;
+  pointer.lastX = prevX;
+  pointer.lastY = prevY;
   pointer.x = newX;
   pointer.y = newY;
   pointer.active = true;
-  addTrailPoint(pointer.x, pointer.y, pointer.vx, pointer.vy);
+  addTrailSegment(prevX, prevY, pointer.x, pointer.y, pointer.vx, pointer.vy);
 }
 
 function renderMobileLiquid(width, height) {
   ctx.clearRect(0, 0, width, height);
 
   const base = ctx.createLinearGradient(0, 0, width, height);
-  base.addColorStop(0, "rgba(60, 200, 255, 0.9)");
-  base.addColorStop(0.5, "rgba(40, 150, 255, 0.85)");
-  base.addColorStop(1, "rgba(20, 110, 230, 0.85)");
+  base.addColorStop(0, "rgba(60, 200, 255, 1)");
+  base.addColorStop(0.5, "rgba(40, 150, 255, 1)");
+  base.addColorStop(1, "rgba(20, 110, 230, 1)");
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, width, height);
 
   const glow = ctx.createRadialGradient(width * 0.2, height * 0.2, 0, width * 0.2, height * 0.2, Math.max(width, height) * 0.8);
-  glow.addColorStop(0, "rgba(120, 255, 255, 0.3)");
+  glow.addColorStop(0, "rgba(120, 255, 255, 0.22)");
   glow.addColorStop(1, "rgba(0, 0, 0, 0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
 
   ctx.globalCompositeOperation = "destination-out";
-  ctx.filter = "blur(18px)";
+  ctx.filter = "blur(26px)";
   for (let i = swipeTrail.length - 1; i >= 0; i -= 1) {
     const p = swipeTrail[i];
     ctx.globalAlpha = p.life;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fill();
-    p.life *= 0.9;
-    p.r *= 0.97;
-    if (p.life < 0.05 || p.r < 5) {
+    p.life *= 0.92;
+    p.r *= 0.985;
+    if (p.life < 0.04 || p.r < 8) {
       swipeTrail.splice(i, 1);
     }
   }
