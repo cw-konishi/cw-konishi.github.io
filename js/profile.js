@@ -9,7 +9,7 @@ const SETTINGS = {
 
 const blobs = [];
 const IS_MOBILE = window.innerWidth <= 768;
-const BLOB_COUNT = IS_MOBILE ? 500 : 400;
+const BLOB_COUNT = IS_MOBILE ? 350 : 400;
 
 let frameCount = 0;
 
@@ -32,9 +32,9 @@ class Blob {
     this.oy = y;
     this.vx = 0;
     this.vy = 0;
-    // Responsive blob size (larger on mobile for better coverage with fewer blobs)
-    const baseSize = IS_MOBILE ? 35 : 100;
-    const randomRange = IS_MOBILE ? 45 : 120;
+    // Responsive blob size (much larger on mobile for liquid feel with fewer blobs)
+    const baseSize = IS_MOBILE ? 60 : 100;
+    const randomRange = IS_MOBILE ? 80 : 120;
     this.size = Math.random() * randomRange + baseSize;
     // Cyan to blue spectrum for unified look
     this.hue = 180 + Math.random() * 40; // 180-220: cyan through blue
@@ -58,7 +58,7 @@ class Blob {
 
   // Repel from other blobs for liquid effect
   repelFromBlobs(blobs) {
-    const step = IS_MOBILE ? 10 : 1;
+    const step = IS_MOBILE ? 15 : 1;
     for (let i = 0; i < blobs.length; i += step) {
       const other = blobs[i];
       if (other === this) continue;
@@ -77,13 +77,13 @@ class Blob {
   }
 
   update(width, height) {
-    this.vx *= 0.9;
-    this.vy *= 0.9;
+    // Less damping for more fluid movement
+    const damping = IS_MOBILE ? 0.85 : 0.9;
+    this.vx *= damping;
+    this.vy *= damping;
 
-    // Return to origin (slower for more liquid feel)
-    const returnForce = 0.001;
-    // Return to origin (slower for more liquid feel)
-    const returnForce = 0.001;
+    // Return to origin (balanced for responsive liquid feel)
+    const returnForce = IS_MOBILE ? 0.005 : 0.001;
     this.vx += (this.ox - this.x) * returnForce;
     this.vy += (this.oy - this.y) * returnForce;
 
@@ -172,20 +172,16 @@ function animate() {
   ctx.clearRect(0, 0, width, height);
   
   // Apply extreme blur for seamless liquid (much stronger on mobile)
-  const blurSize = IS_MOBILE ? 200 : 80;
+  const blurSize = IS_MOBILE ? 250 : 80;
   ctx.filter = `blur(${blurSize}px)`;
 
-  // Update and display blobs (more aggressive frame skip on mobile)
-  frameCount += 1;
-  const shouldUpdate = !IS_MOBILE || frameCount % 3 === 0;
+  // Update and display blobs (smooth animation on mobile - no frame skip)
   for (const blob of blobs) {
-    if (shouldUpdate) {
-      if (pointer.active) {
-        blob.pushFromCursor(pointer.x, pointer.y);
-      }
-      blob.repelFromBlobs(blobs);
-      blob.update(width, height);
+    if (pointer.active) {
+      blob.pushFromCursor(pointer.x, pointer.y);
     }
+    blob.repelFromBlobs(blobs);
+    blob.update(width, height);
     blob.display();
   }
   
