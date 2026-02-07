@@ -8,7 +8,8 @@ const SETTINGS = {
 };
 
 const blobs = [];
-const BLOB_COUNT = window.innerWidth <= 768 ? 1500 : 400;
+const IS_MOBILE = window.innerWidth <= 768;
+const BLOB_COUNT = IS_MOBILE ? 800 : 400;
 
 const pointer = {
   x: 0,
@@ -30,9 +31,8 @@ class Blob {
     this.vx = 0;
     this.vy = 0;
     // Responsive blob size
-    const isMobile = window.innerWidth <= 768;
-    const baseSize = isMobile ? 10 : 100;
-    const randomRange = isMobile ? 15 : 120;
+    const baseSize = IS_MOBILE ? 10 : 100;
+    const randomRange = IS_MOBILE ? 15 : 120;
     this.size = Math.random() * randomRange + baseSize;
     // Cyan to blue spectrum for unified look
     this.hue = 180 + Math.random() * 40; // 180-220: cyan through blue
@@ -44,8 +44,7 @@ class Blob {
     const dy = this.y - cy;
     const distance = Math.hypot(dx, dy);
     // Responsive push radius
-    const isMobile = window.innerWidth <= 768;
-    const pushRadius = isMobile ? 120 : 700;
+    const pushRadius = IS_MOBILE ? 120 : 700;
 
     if (distance > 0 && distance < pushRadius) {
       const influence = 1 - distance / pushRadius;
@@ -57,7 +56,9 @@ class Blob {
 
   // Repel from other blobs for liquid effect
   repelFromBlobs(blobs) {
-    for (const other of blobs) {
+    const step = IS_MOBILE ? 3 : 1;
+    for (let i = 0; i < blobs.length; i += step) {
+      const other = blobs[i];
       if (other === this) continue;
       const dx = this.x - other.x;
       const dy = this.y - other.y;
@@ -65,8 +66,7 @@ class Blob {
       const minDistance = (this.size + other.size) * 0.5;
 
       if (distance > 0 && distance < minDistance) {
-        const isMobile = window.innerWidth <= 768;
-        const forceScale = isMobile ? 0.012 : 0.02;
+        const forceScale = IS_MOBILE ? 0.012 : 0.02;
         const force = (minDistance - distance) * forceScale;
         this.vx += (dx / distance) * force;
         this.vy += (dy / distance) * force;
@@ -96,8 +96,7 @@ class Blob {
   }
 
   display() {
-    const isMobile = window.innerWidth <= 768;
-    const alphaScale = isMobile ? 0.75 : 1;
+    const alphaScale = IS_MOBILE ? 0.85 : 1;
     const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
     gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, ${0.9 * alphaScale})`);
     gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, ${0.85 * alphaScale})`);
@@ -169,7 +168,7 @@ function animate() {
   ctx.clearRect(0, 0, width, height);
   
   // Apply extreme blur for seamless liquid
-  const blurSize = window.innerWidth <= 768 ? 110 : 80;
+  const blurSize = IS_MOBILE ? 130 : 80;
   ctx.filter = `blur(${blurSize}px)`;
 
   // Update and display blobs
@@ -191,17 +190,14 @@ resizeCanvas();
 const { width, height } = canvas.getBoundingClientRect();
 initBlobs(width, height);
 
-// Detect mobile device
-const isMobile = window.innerWidth <= 768;
-
 // Setup name container with neon decoration
 const nameContainer = document.querySelector("#name-container");
 nameContainer.style.cssText = `
   position: fixed;
-  top: ${isMobile ? '30%' : '35%'};
+  top: ${IS_MOBILE ? '30%' : '35%'};
   left: 50%;
   transform: translate(-50%, -50%);
-  padding: ${isMobile ? '4vw 5vw' : '3vw 4vw'};
+  padding: ${IS_MOBILE ? '4vw 5vw' : '3vw 4vw'};
   border: 2px solid rgba(150, 255, 255, 0.4);
   border-radius: 8px;
   box-shadow: 
@@ -235,13 +231,13 @@ const introText = document.querySelector("#intro-text");
 introText.textContent = SETTINGS.introduction;
 introText.style.cssText = `
   position: fixed;
-  bottom: ${isMobile ? '25%' : '15%'};
+  bottom: ${IS_MOBILE ? '25%' : '15%'};
   left: 50%;
   transform: translateX(-50%);
-  max-width: ${isMobile ? '85vw' : '60vw'};
-  max-height: ${isMobile ? '30vh' : '25vh'};
+  max-width: ${IS_MOBILE ? '85vw' : '60vw'};
+  max-height: ${IS_MOBILE ? '30vh' : '25vh'};
   overflow: hidden;
-  font-size: ${isMobile ? 'clamp(0.8rem, 3.5vw, 1rem)' : '2vw'};
+  font-size: ${IS_MOBILE ? 'clamp(0.8rem, 3.5vw, 1rem)' : '2vw'};
   font-weight: 500;
   line-height: 1.8;
   color: rgba(200, 240, 255, 0.75);
