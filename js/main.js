@@ -336,3 +336,38 @@ canvas.addEventListener("mouseleave", fadePointer);
 canvas.addEventListener("touchstart", updatePointerTouch, { passive: true });
 canvas.addEventListener("touchmove", updatePointerTouch, { passive: true });
 canvas.addEventListener("touchend", fadePointer);
+
+// Navigation: Double-click or long-press to go to profile page
+let longPressTimer = null;
+let touchStartTime = 0;
+
+canvas.addEventListener("dblclick", () => {
+  window.location.href = "profile.html";
+});
+
+canvas.addEventListener("touchstart", (e) => {
+  touchStartTime = Date.now();
+  longPressTimer = setTimeout(() => {
+    // Visual feedback
+    canvas.style.transition = "opacity 0.3s";
+    canvas.style.opacity = "0.7";
+    setTimeout(() => {
+      window.location.href = "profile.html";
+    }, 300);
+  }, 800); // 800ms long press
+}, { passive: true });
+
+canvas.addEventListener("touchend", () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  canvas.style.opacity = "1";
+}, { passive: true });
+
+canvas.addEventListener("touchmove", () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}, { passive: true });
