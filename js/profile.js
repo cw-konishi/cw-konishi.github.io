@@ -4,7 +4,7 @@ const ctx = canvas.getContext("2d");
 // Self-introduction settings
 const SETTINGS = {
   name: "Kota Konishi",
-  introduction: "I'm a software engineer based in Japan.\nI'm interested in AI-driven development, working on GitHub Copilot adoption and transforming\ndevelopment workflows.\nI also have experience with Zabbix for monitoring and server operations."
+  introduction: "I'm a IT engineer based in Japan.\nI'm interested in AI-driven development, working on GitHub Copilot adoption and transforming\ndevelopment workflows.\nI also have experience with Zabbix for monitoring and server operations."
 };
 
 const blobs = [];
@@ -29,7 +29,11 @@ class Blob {
     this.oy = y;
     this.vx = 0;
     this.vy = 0;
-    this.size = Math.random() * 120 + 100;
+    // Responsive blob size
+    const isMobile = window.innerWidth <= 768;
+    const baseSize = isMobile ? 40 : 100;
+    const randomRange = isMobile ? 50 : 120;
+    this.size = Math.random() * randomRange + baseSize;
     // Cyan to blue spectrum for unified look
     this.hue = 180 + Math.random() * 40; // 180-220: cyan through blue
   }
@@ -39,7 +43,9 @@ class Blob {
     const dx = this.x - cx;
     const dy = this.y - cy;
     const distance = Math.hypot(dx, dy);
-    const pushRadius = 700;
+    // Responsive push radius
+    const isMobile = window.innerWidth <= 768;
+    const pushRadius = isMobile ? 300 : 700;
 
     if (distance > 0 && distance < pushRadius) {
       const influence = 1 - distance / pushRadius;
@@ -180,14 +186,17 @@ resizeCanvas();
 const { width, height } = canvas.getBoundingClientRect();
 initBlobs(width, height);
 
+// Detect mobile device
+const isMobile = window.innerWidth <= 768;
+
 // Setup name container with neon decoration
 const nameContainer = document.querySelector("#name-container");
 nameContainer.style.cssText = `
   position: fixed;
-  top: 35%;
+  top: ${isMobile ? '30%' : '35%'};
   left: 50%;
   transform: translate(-50%, -50%);
-  padding: 3vw 4vw;
+  padding: ${isMobile ? '4vw 5vw' : '3vw 4vw'};
   border: 2px solid rgba(150, 255, 255, 0.4);
   border-radius: 8px;
   box-shadow: 
@@ -221,13 +230,13 @@ const introText = document.querySelector("#intro-text");
 introText.textContent = SETTINGS.introduction;
 introText.style.cssText = `
   position: fixed;
-  bottom: 15%;
+  bottom: ${isMobile ? '25%' : '15%'};
   left: 50%;
   transform: translateX(-50%);
-  max-width: 60vw;
-  max-height: 25vh;
+  max-width: ${isMobile ? '85vw' : '60vw'};
+  max-height: ${isMobile ? '30vh' : '25vh'};
   overflow: hidden;
-  font-size: 2vw;
+  font-size: ${isMobile ? 'clamp(0.8rem, 3.5vw, 1rem)' : '2vw'};
   font-weight: 500;
   line-height: 1.8;
   color: rgba(200, 240, 255, 0.75);
