@@ -8,7 +8,7 @@ const SETTINGS = {
 };
 
 const blobs = [];
-const BLOB_COUNT = window.innerWidth <= 768 ? 1200 : 400;
+const BLOB_COUNT = window.innerWidth <= 768 ? 5000 : 400;
 
 const pointer = {
   x: 0,
@@ -45,7 +45,7 @@ class Blob {
     const distance = Math.hypot(dx, dy);
     // Responsive push radius
     const isMobile = window.innerWidth <= 768;
-    const pushRadius = isMobile ? 180 : 700;
+    const pushRadius = isMobile ? 120 : 700;
 
     if (distance > 0 && distance < pushRadius) {
       const influence = 1 - distance / pushRadius;
