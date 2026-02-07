@@ -82,6 +82,8 @@ class Blob {
 
     // Return to origin (slower for more liquid feel)
     const returnForce = 0.001;
+    // Return to origin (slower for more liquid feel)
+    const returnForce = 0.001;
     this.vx += (this.ox - this.x) * returnForce;
     this.vy += (this.oy - this.y) * returnForce;
 
