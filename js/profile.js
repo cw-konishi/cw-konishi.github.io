@@ -9,7 +9,9 @@ const SETTINGS = {
 
 const blobs = [];
 const IS_MOBILE = window.innerWidth <= 768;
-const BLOB_COUNT = IS_MOBILE ? 800 : 400;
+const BLOB_COUNT = IS_MOBILE ? 700 : 400;
+
+let frameCount = 0;
 
 const pointer = {
   x: 0,
@@ -31,8 +33,8 @@ class Blob {
     this.vx = 0;
     this.vy = 0;
     // Responsive blob size
-    const baseSize = IS_MOBILE ? 10 : 100;
-    const randomRange = IS_MOBILE ? 15 : 120;
+    const baseSize = IS_MOBILE ? 22 : 100;
+    const randomRange = IS_MOBILE ? 30 : 120;
     this.size = Math.random() * randomRange + baseSize;
     // Cyan to blue spectrum for unified look
     this.hue = 180 + Math.random() * 40; // 180-220: cyan through blue
@@ -56,7 +58,7 @@ class Blob {
 
   // Repel from other blobs for liquid effect
   repelFromBlobs(blobs) {
-    const step = IS_MOBILE ? 3 : 1;
+    const step = IS_MOBILE ? 5 : 1;
     for (let i = 0; i < blobs.length; i += step) {
       const other = blobs[i];
       if (other === this) continue;
@@ -66,7 +68,7 @@ class Blob {
       const minDistance = (this.size + other.size) * 0.5;
 
       if (distance > 0 && distance < minDistance) {
-        const forceScale = IS_MOBILE ? 0.012 : 0.02;
+        const forceScale = IS_MOBILE ? 0.01 : 0.02;
         const force = (minDistance - distance) * forceScale;
         this.vx += (dx / distance) * force;
         this.vy += (dy / distance) * force;
@@ -96,7 +98,7 @@ class Blob {
   }
 
   display() {
-    const alphaScale = IS_MOBILE ? 0.85 : 1;
+    const alphaScale = IS_MOBILE ? 0.95 : 1;
     const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
     gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, ${0.9 * alphaScale})`);
     gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, ${0.85 * alphaScale})`);
@@ -168,16 +170,20 @@ function animate() {
   ctx.clearRect(0, 0, width, height);
   
   // Apply extreme blur for seamless liquid
-  const blurSize = IS_MOBILE ? 130 : 80;
+  const blurSize = IS_MOBILE ? 120 : 80;
   ctx.filter = `blur(${blurSize}px)`;
 
   // Update and display blobs
+  frameCount += 1;
+  const shouldUpdate = !IS_MOBILE || frameCount % 2 === 0;
   for (const blob of blobs) {
-    if (pointer.active) {
-      blob.pushFromCursor(pointer.x, pointer.y);
+    if (shouldUpdate) {
+      if (pointer.active) {
+        blob.pushFromCursor(pointer.x, pointer.y);
+      }
+      blob.repelFromBlobs(blobs);
+      blob.update(width, height);
     }
-    blob.repelFromBlobs(blobs);
-    blob.update(width, height);
     blob.display();
   }
   
