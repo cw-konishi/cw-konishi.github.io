@@ -8,7 +8,7 @@ const SETTINGS = {
 };
 
 const blobs = [];
-const BLOB_COUNT = window.innerWidth <= 768 ? 2500 : 400;
+const BLOB_COUNT = window.innerWidth <= 768 ? 1500 : 400;
 
 const pointer = {
   x: 0,
@@ -65,7 +65,9 @@ class Blob {
       const minDistance = (this.size + other.size) * 0.5;
 
       if (distance > 0 && distance < minDistance) {
-        const force = (minDistance - distance) * 0.02;
+        const isMobile = window.innerWidth <= 768;
+        const forceScale = isMobile ? 0.012 : 0.02;
+        const force = (minDistance - distance) * forceScale;
         this.vx += (dx / distance) * force;
         this.vy += (dy / distance) * force;
       }
@@ -94,11 +96,13 @@ class Blob {
   }
 
   display() {
+    const isMobile = window.innerWidth <= 768;
+    const alphaScale = isMobile ? 0.75 : 1;
     const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
-    gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, 0.9)`);
-    gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, 0.85)`);
-    gradient.addColorStop(0.6, `hsla(${this.hue}, 70%, 45%, 0.7)`);
-    gradient.addColorStop(1, `hsla(${this.hue}, 65%, 35%, 0.4)`);
+    gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, ${0.9 * alphaScale})`);
+    gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, ${0.85 * alphaScale})`);
+    gradient.addColorStop(0.6, `hsla(${this.hue}, 70%, 45%, ${0.7 * alphaScale})`);
+    gradient.addColorStop(1, `hsla(${this.hue}, 65%, 35%, ${0.4 * alphaScale})`);
     
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -165,7 +169,8 @@ function animate() {
   ctx.clearRect(0, 0, width, height);
   
   // Apply extreme blur for seamless liquid
-  ctx.filter = "blur(80px)";
+  const blurSize = window.innerWidth <= 768 ? 110 : 80;
+  ctx.filter = `blur(${blurSize}px)`;
 
   // Update and display blobs
   for (const blob of blobs) {
