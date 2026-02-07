@@ -9,7 +9,7 @@ const SETTINGS = {
 
 const blobs = [];
 const IS_MOBILE = window.innerWidth <= 768;
-const BLOB_COUNT = IS_MOBILE ? 700 : 400;
+const BLOB_COUNT = IS_MOBILE ? 500 : 400;
 
 let frameCount = 0;
 
@@ -32,9 +32,9 @@ class Blob {
     this.oy = y;
     this.vx = 0;
     this.vy = 0;
-    // Responsive blob size
-    const baseSize = IS_MOBILE ? 22 : 100;
-    const randomRange = IS_MOBILE ? 30 : 120;
+    // Responsive blob size (larger on mobile for better coverage with fewer blobs)
+    const baseSize = IS_MOBILE ? 35 : 100;
+    const randomRange = IS_MOBILE ? 45 : 120;
     this.size = Math.random() * randomRange + baseSize;
     // Cyan to blue spectrum for unified look
     this.hue = 180 + Math.random() * 40; // 180-220: cyan through blue
@@ -58,7 +58,7 @@ class Blob {
 
   // Repel from other blobs for liquid effect
   repelFromBlobs(blobs) {
-    const step = IS_MOBILE ? 7 : 1;
+    const step = IS_MOBILE ? 10 : 1;
     for (let i = 0; i < blobs.length; i += step) {
       const other = blobs[i];
       if (other === this) continue;
@@ -98,7 +98,7 @@ class Blob {
   }
 
   display() {
-    const alphaScale = IS_MOBILE ? 0.98 : 1;
+    const alphaScale = IS_MOBILE ? 1.0 : 1;
     const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
     gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, ${0.9 * alphaScale})`);
     gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, ${0.85 * alphaScale})`);
@@ -169,13 +169,13 @@ function animate() {
 
   ctx.clearRect(0, 0, width, height);
   
-  // Apply extreme blur for seamless liquid (enhanced for more liquid feel)
-  const blurSize = IS_MOBILE ? 160 : 80;
+  // Apply extreme blur for seamless liquid (much stronger on mobile)
+  const blurSize = IS_MOBILE ? 200 : 80;
   ctx.filter = `blur(${blurSize}px)`;
 
-  // Update and display blobs
+  // Update and display blobs (more aggressive frame skip on mobile)
   frameCount += 1;
-  const shouldUpdate = !IS_MOBILE || frameCount % 2 === 0;
+  const shouldUpdate = !IS_MOBILE || frameCount % 3 === 0;
   for (const blob of blobs) {
     if (shouldUpdate) {
       if (pointer.active) {
