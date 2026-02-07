@@ -8,7 +8,7 @@ const SETTINGS = {
 };
 
 const blobs = [];
-const BLOB_COUNT = window.innerWidth <= 768 ? 5000 : 400;
+const BLOB_COUNT = window.innerWidth <= 768 ? 2500 : 400;
 
 const pointer = {
   x: 0,
