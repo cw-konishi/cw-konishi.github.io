@@ -58,7 +58,7 @@ class Blob {
 
   // Repel from other blobs for liquid effect
   repelFromBlobs(blobs) {
-    const step = IS_MOBILE ? 5 : 1;
+    const step = IS_MOBILE ? 7 : 1;
     for (let i = 0; i < blobs.length; i += step) {
       const other = blobs[i];
       if (other === this) continue;
@@ -80,8 +80,8 @@ class Blob {
     this.vx *= 0.9;
     this.vy *= 0.9;
 
-    // Return to origin
-    const returnForce = 0.008;
+    // Return to origin (slower for more liquid feel)
+    const returnForce = 0.001;
     this.vx += (this.ox - this.x) * returnForce;
     this.vy += (this.oy - this.y) * returnForce;
 
@@ -98,7 +98,7 @@ class Blob {
   }
 
   display() {
-    const alphaScale = IS_MOBILE ? 0.95 : 1;
+    const alphaScale = IS_MOBILE ? 0.98 : 1;
     const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
     gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, ${0.9 * alphaScale})`);
     gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, ${0.85 * alphaScale})`);
@@ -169,8 +169,8 @@ function animate() {
 
   ctx.clearRect(0, 0, width, height);
   
-  // Apply extreme blur for seamless liquid
-  const blurSize = IS_MOBILE ? 120 : 80;
+  // Apply extreme blur for seamless liquid (enhanced for more liquid feel)
+  const blurSize = IS_MOBILE ? 160 : 80;
   ctx.filter = `blur(${blurSize}px)`;
 
   // Update and display blobs
