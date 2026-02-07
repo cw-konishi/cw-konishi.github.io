@@ -9,5 +9,48 @@
   <body>
     <canvas id="stage" aria-label="Interactive canvas"></canvas>
     <script src="js/main.js"></script>
+    <script>
+      (function() {
+        let tapCount = 0;
+        let tapTimer = null;
+        const REVEAL_TAPS = 10;
+        const REVEAL_TIMEOUT = 3000;
+        const canvas = document.querySelector('#stage');
+
+        canvas.addEventListener('click', (e) => {
+          if (e.detail === 2) return;
+          clearTimeout(tapTimer);
+          tapCount += 1;
+          if (tapCount === REVEAL_TAPS) {
+            triggerReveal();
+          } else {
+            tapTimer = setTimeout(() => { tapCount = 0; }, REVEAL_TIMEOUT);
+          }
+        });
+
+        canvas.addEventListener('dblclick', () => {
+          tapCount = 0;
+          clearTimeout(tapTimer);
+        });
+
+        function triggerReveal() {
+          tapCount = 0;
+          const overlay = document.createElement('div');
+          overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(120, 210, 255, 0.1);
+            backdrop-filter: blur(2px);
+            animation: revealPulse 0.4s ease-out;
+          `;
+          document.body.appendChild(overlay);
+          setTimeout(() => overlay.remove(), 400);
+          setTimeout(() => { window.location.href = 'game.html'; }, 600);
+        }
+
+        const style = document.createElement('style');
+        style.textContent = '@keyframes revealPulse { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }';
+        document.head.appendChild(style);
+      })();
+    </script>
   </body>
 </html>

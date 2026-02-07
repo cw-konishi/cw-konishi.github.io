@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Breakout</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="game-ui-top" style="pointer-events: none;">
+      <div class="game-stats">
+        <span>Score:</span>
+        <span id="score">0</span>
+        <span class="stat-divider"></span>
+        <span>Lives:</span>
+        <span id="lives">3</span>
+      </div>
+    </div>
+    <div id="game-ui-bottom" style="pointer-events: none;">
+      <div class="game-sub">Tap or click to launch. Swipe or move to control.</div>
+      <div id="status-text"></div>
+    </div>
+    <canvas id="stage" aria-label="Breakout game canvas"></canvas>
+    <script src="js/game.js"></script>
+  </body>
+</html>
