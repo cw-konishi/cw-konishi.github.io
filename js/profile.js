@@ -31,8 +31,8 @@ class Blob {
     this.vy = 0;
     // Responsive blob size
     const isMobile = window.innerWidth <= 768;
-    const baseSize = isMobile ? 40 : 100;
-    const randomRange = isMobile ? 50 : 120;
+    const baseSize = isMobile ? 20 : 100;
+    const randomRange = isMobile ? 25 : 120;
     this.size = Math.random() * randomRange + baseSize;
     // Cyan to blue spectrum for unified look
     this.hue = 180 + Math.random() * 40; // 180-220: cyan through blue
