@@ -9,7 +9,7 @@ const SETTINGS = {
 
 const blobs = [];
 const IS_MOBILE = window.innerWidth <= 768;
-const BLOB_COUNT = IS_MOBILE ? 350 : 400;
+const BLOB_COUNT = IS_MOBILE ? 0 : 400;
 
 let frameCount = 0;
 
@@ -22,6 +22,9 @@ const pointer = {
   lastX: 0,
   lastY: 0,
 };
+
+const swipeTrail = [];
+const TRAIL_MAX = IS_MOBILE ? 80 : 0;
 
 // Blob class: liquid-like circle
 class Blob {
@@ -123,11 +126,22 @@ function resizeCanvas() {
 }
 
 function initBlobs(width, height) {
+  if (BLOB_COUNT === 0) return;
   blobs.length = 0;
   for (let i = 0; i < BLOB_COUNT; i++) {
     const x = Math.random() * width;
     const y = Math.random() * height;
     blobs.push(new Blob(x, y));
+  }
+}
+
+function addTrailPoint(x, y, vx, vy) {
+  if (!IS_MOBILE) return;
+  const speed = Math.hypot(vx, vy);
+  const radius = Math.min(140, 60 + speed * 1.6);
+  swipeTrail.push({ x, y, r: radius, life: 1 });
+  if (swipeTrail.length > TRAIL_MAX) {
+    swipeTrail.shift();
   }
 }
 
@@ -143,6 +157,7 @@ function updatePointer(event) {
   pointer.x = newX;
   pointer.y = newY;
   pointer.active = true;
+  addTrailPoint(pointer.x, pointer.y, pointer.vx, pointer.vy);
 }
 
 function fadePointer() {
@@ -164,10 +179,53 @@ function updatePointerTouch(event) {
   pointer.x = newX;
   pointer.y = newY;
   pointer.active = true;
+  addTrailPoint(pointer.x, pointer.y, pointer.vx, pointer.vy);
+}
+
+function renderMobileLiquid(width, height) {
+  ctx.clearRect(0, 0, width, height);
+
+  const base = ctx.createLinearGradient(0, 0, width, height);
+  base.addColorStop(0, "rgba(60, 200, 255, 0.9)");
+  base.addColorStop(0.5, "rgba(40, 150, 255, 0.85)");
+  base.addColorStop(1, "rgba(20, 110, 230, 0.85)");
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, width, height);
+
+  const glow = ctx.createRadialGradient(width * 0.2, height * 0.2, 0, width * 0.2, height * 0.2, Math.max(width, height) * 0.8);
+  glow.addColorStop(0, "rgba(120, 255, 255, 0.3)");
+  glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.filter = "blur(18px)";
+  for (let i = swipeTrail.length - 1; i >= 0; i -= 1) {
+    const p = swipeTrail[i];
+    ctx.globalAlpha = p.life;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    p.life *= 0.9;
+    p.r *= 0.97;
+    if (p.life < 0.05 || p.r < 5) {
+      swipeTrail.splice(i, 1);
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.filter = "none";
+  ctx.globalCompositeOperation = "source-over";
 }
 
 function animate() {
   const { width, height } = canvas.getBoundingClientRect();
+
+  if (IS_MOBILE) {
+    renderMobileLiquid(width, height);
+    requestAnimationFrame(animate);
+    return;
+  }
 
   ctx.clearRect(0, 0, width, height);
   
