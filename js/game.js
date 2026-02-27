@@ -52,6 +52,7 @@ let bricks = [];
 const particles = [];
 const powerUps = [];
 const comboText = { text: "", x: 0, y: 0, life: 0, scale: 1 };
+let activePowerUps = { paddle: null, speed: null };
 
 function resizeCanvas() {
   const { width, height } = canvas.getBoundingClientRect();
@@ -63,7 +64,7 @@ function resizeCanvas() {
   state.height = height;
 
   const isMobile = width < 720;
-  paddle.width = isMobile ? width * 0.35 : width * 0.18;
+  paddle.width = getDefaultPaddleWidth();
   paddle.height = isMobile ? 18 : 16;
   paddle.y = height - (isMobile ? 80 : 70);
   paddle.x = (width - paddle.width) / 2;
@@ -157,7 +158,7 @@ function spawnParticles(x, y, hue, count = 10) {
 }
 
 function spawnPowerUp(x, y) {
-  const types = ['expand', 'shrink', 'speedup', 'slowdown'];
+  const types = ['expand', 'shrink', 'speedUp', 'slowDown'];
   const type = types[Math.floor(Math.random() * types.length)];
   powerUps.push({
     x,
@@ -165,7 +166,7 @@ function spawnPowerUp(x, y) {
     vy: 80,
     type,
     radius: 12,
-    hue: type === 'expand' ? 120 : type === 'shrink' ? 0 : type === 'speedup' ? 280 : 180,
+    hue: type === 'expand' ? 120 : type === 'shrink' ? 0 : type === 'speedUp' ? 280 : 180,
   });
 }
 
@@ -351,31 +352,47 @@ function updatePowerUps(dt) {
   }
 }
 
+function getDefaultPaddleWidth() {
+  return state.width < 720 ? state.width * 0.35 : state.width * 0.18;
+}
+
 function applyPowerUp(type) {
+  const MIN_PADDLE_WIDTH = 80;
+  const PADDLE_DURATION = 8000;
+  const SPEED_DURATION = 6000;
+  
   switch (type) {
     case 'expand':
+      if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
       paddle.width = Math.min(paddle.width * 1.3, state.width * 0.4);
-      setTimeout(() => {
-        paddle.width = state.width < 720 ? state.width * 0.35 : state.width * 0.18;
-      }, 8000);
+      activePowerUps.paddle = setTimeout(() => {
+        paddle.width = getDefaultPaddleWidth();
+        activePowerUps.paddle = null;
+      }, PADDLE_DURATION);
       break;
     case 'shrink':
-      paddle.width = Math.max(paddle.width * 0.7, 80);
-      setTimeout(() => {
-        paddle.width = state.width < 720 ? state.width * 0.35 : state.width * 0.18;
-      }, 8000);
+      if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
+      paddle.width = Math.max(paddle.width * 0.7, MIN_PADDLE_WIDTH);
+      activePowerUps.paddle = setTimeout(() => {
+        paddle.width = getDefaultPaddleWidth();
+        activePowerUps.paddle = null;
+      }, PADDLE_DURATION);
       break;
-    case 'speedup':
+    case 'speedUp':
+      if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
       ball.speed *= 1.25;
-      setTimeout(() => {
+      activePowerUps.speed = setTimeout(() => {
         ball.speed = ball.baseSpeed + (state.level - 1) * 40;
-      }, 6000);
+        activePowerUps.speed = null;
+      }, SPEED_DURATION);
       break;
-    case 'slowdown':
+    case 'slowDown':
+      if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
       ball.speed *= 0.75;
-      setTimeout(() => {
+      activePowerUps.speed = setTimeout(() => {
         ball.speed = ball.baseSpeed + (state.level - 1) * 40;
-      }, 6000);
+        activePowerUps.speed = null;
+      }, SPEED_DURATION);
       break;
   }
 }
@@ -486,7 +503,8 @@ function drawPowerUps() {
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const letter = powerUp.type[0].toUpperCase();
+    const icons = { expand: 'W', shrink: 'N', speedUp: '+', slowDown: '-' };
+    const letter = icons[powerUp.type] || '?';
     ctx.fillText(letter, powerUp.x, powerUp.y);
     ctx.restore();
   }
