@@ -333,7 +333,7 @@ function updateBall(dt) {
     if (activePowerUps.speed) {
       // Calculate current multiplier from previous level's base speed
       const prevLevelSpeed = ball.baseSpeed + (state.level - 2) * LEVEL_SPEED_INCREMENT;
-      const currentMultiplier = prevLevelSpeed > 0 ? ball.speed / prevLevelSpeed : 1;
+      const currentMultiplier = ball.speed / prevLevelSpeed;
       ball.speed = newSpeed * currentMultiplier;
     } else {
       ball.speed = newSpeed;
@@ -519,14 +519,14 @@ function drawPowerUps(now) {
     ctx.arc(powerUp.x, powerUp.y, powerUp.radius * pulse, 0, Math.PI * 2);
     ctx.fill();
     
-    // Draw letter for power-up type
+    // Draw symbol for power-up type
     ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const icons = { expand: 'W', shrink: '<', speedUp: '+', slowDown: '-' };
-    const letter = icons[powerUp.type] || '?';
-    ctx.fillText(letter, powerUp.x, powerUp.y);
+    const powerUpSymbols = { expand: 'W', shrink: '<', speedUp: '+', slowDown: '-' };
+    const symbol = powerUpSymbols[powerUp.type] || '?';
+    ctx.fillText(symbol, powerUp.x, powerUp.y);
     ctx.restore();
   }
 }
