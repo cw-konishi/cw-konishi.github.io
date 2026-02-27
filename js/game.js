@@ -54,6 +54,13 @@ const powerUps = [];
 const comboText = { text: "", x: 0, y: 0, life: 0, scale: 1 };
 let activePowerUps = { paddle: null, speed: null };
 
+// Power-up constants
+const POWER_UP_PADDLE_EXPAND = 1.3;
+const POWER_UP_PADDLE_SHRINK = 0.7;
+const POWER_UP_SPEED_UP = 1.25;
+const POWER_UP_SPEED_DOWN = 0.75;
+const LEVEL_SPEED_INCREMENT = 40;
+
 function resizeCanvas() {
   const { width, height } = canvas.getBoundingClientRect();
   state.dpr = window.devicePixelRatio || 1;
@@ -320,7 +327,7 @@ function updateBall(dt) {
   if (bricks.every((brick) => !brick.alive)) {
     state.level += 1;
     levelEl.textContent = state.level;
-    ball.speed = ball.baseSpeed + (state.level - 1) * 40;
+    ball.speed = calculateBallSpeed();
     buildBricks();
     ball.launched = false;
     statusEl.textContent = `Level ${state.level} - Tap to continue`;
@@ -356,6 +363,10 @@ function getDefaultPaddleWidth() {
   return state.width < 720 ? state.width * 0.35 : state.width * 0.18;
 }
 
+function calculateBallSpeed() {
+  return ball.baseSpeed + (state.level - 1) * LEVEL_SPEED_INCREMENT;
+}
+
 function applyPowerUp(type) {
   const MIN_PADDLE_WIDTH = 80;
   const PADDLE_DURATION = 8000;
@@ -364,7 +375,7 @@ function applyPowerUp(type) {
   switch (type) {
     case 'expand':
       if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
-      paddle.width = Math.min(paddle.width * 1.3, state.width * 0.4);
+      paddle.width = Math.min(paddle.width * POWER_UP_PADDLE_EXPAND, state.width * 0.4);
       activePowerUps.paddle = setTimeout(() => {
         paddle.width = getDefaultPaddleWidth();
         activePowerUps.paddle = null;
@@ -372,7 +383,7 @@ function applyPowerUp(type) {
       break;
     case 'shrink':
       if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
-      paddle.width = Math.max(paddle.width * 0.7, MIN_PADDLE_WIDTH);
+      paddle.width = Math.max(paddle.width * POWER_UP_PADDLE_SHRINK, MIN_PADDLE_WIDTH);
       activePowerUps.paddle = setTimeout(() => {
         paddle.width = getDefaultPaddleWidth();
         activePowerUps.paddle = null;
@@ -380,17 +391,17 @@ function applyPowerUp(type) {
       break;
     case 'speedUp':
       if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
-      ball.speed *= 1.25;
+      ball.speed *= POWER_UP_SPEED_UP;
       activePowerUps.speed = setTimeout(() => {
-        ball.speed = ball.baseSpeed + (state.level - 1) * 40;
+        ball.speed = calculateBallSpeed();
         activePowerUps.speed = null;
       }, SPEED_DURATION);
       break;
     case 'slowDown':
       if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
-      ball.speed *= 0.75;
+      ball.speed *= POWER_UP_SPEED_DOWN;
       activePowerUps.speed = setTimeout(() => {
-        ball.speed = ball.baseSpeed + (state.level - 1) * 40;
+        ball.speed = calculateBallSpeed();
         activePowerUps.speed = null;
       }, SPEED_DURATION);
       break;
@@ -486,13 +497,14 @@ function drawBricks() {
 }
 
 function drawPowerUps() {
+  const now = Date.now();
   for (const powerUp of powerUps) {
     ctx.save();
     ctx.shadowColor = `hsla(${powerUp.hue}, 80%, 60%, 0.9)`;
     ctx.shadowBlur = 16;
     
     // Draw pulsing circle
-    const pulse = 1 + Math.sin(Date.now() * 0.008) * 0.15;
+    const pulse = 1 + Math.sin(now * 0.008) * 0.15;
     ctx.fillStyle = `hsla(${powerUp.hue}, 85%, 65%, 0.9)`;
     ctx.beginPath();
     ctx.arc(powerUp.x, powerUp.y, powerUp.radius * pulse, 0, Math.PI * 2);
@@ -503,7 +515,7 @@ function drawPowerUps() {
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const icons = { expand: 'W', shrink: 'N', speedUp: '+', slowDown: '-' };
+    const icons = { expand: 'W', shrink: '<', speedUp: '+', slowDown: '-' };
     const letter = icons[powerUp.type] || '?';
     ctx.fillText(letter, powerUp.x, powerUp.y);
     ctx.restore();
