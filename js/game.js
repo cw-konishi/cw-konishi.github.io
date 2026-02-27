@@ -331,7 +331,9 @@ function updateBall(dt) {
     const newSpeed = calculateBallSpeed();
     // Preserve active speed power-up effect
     if (activePowerUps.speed) {
-      const currentMultiplier = ball.speed / (ball.baseSpeed + (state.level - 2) * LEVEL_SPEED_INCREMENT);
+      // Calculate current multiplier from previous level's base speed
+      const prevLevelSpeed = ball.baseSpeed + (state.level - 2) * LEVEL_SPEED_INCREMENT;
+      const currentMultiplier = prevLevelSpeed > 0 ? ball.speed / prevLevelSpeed : 1;
       ball.speed = newSpeed * currentMultiplier;
     } else {
       ball.speed = newSpeed;
