@@ -260,14 +260,15 @@ function updateBall(dt) {
         state.maxCombo = state.combo;
       }
       
-      // Calculate score with combo multiplier
-      const multiplier = Math.min(Math.floor(state.combo / 3) + 1, 5);
+      // Calculate score with combo multiplier (increases every 3 hits)
+      const multiplier = Math.min(1 + Math.floor(state.combo / 3), 5);
+      const prevMultiplier = Math.min(1 + Math.floor((state.combo - 1) / 3), 5);
       const points = brick.points * multiplier;
       state.score += points;
       scoreEl.textContent = state.score;
       
-      // Show combo text for combos >= 3
-      if (state.combo >= 3 && state.combo % 3 === 0) {
+      // Show combo text only when multiplier actually increases
+      if (multiplier > prevMultiplier && multiplier > 1) {
         showComboText(ball.x, ball.y - 30, multiplier);
       }
       
@@ -327,7 +328,14 @@ function updateBall(dt) {
   if (bricks.every((brick) => !brick.alive)) {
     state.level += 1;
     levelEl.textContent = state.level;
-    ball.speed = calculateBallSpeed();
+    const newSpeed = calculateBallSpeed();
+    // Preserve active speed power-up effect
+    if (activePowerUps.speed) {
+      const currentMultiplier = ball.speed / (ball.baseSpeed + (state.level - 2) * LEVEL_SPEED_INCREMENT);
+      ball.speed = newSpeed * currentMultiplier;
+    } else {
+      ball.speed = newSpeed;
+    }
     buildBricks();
     ball.launched = false;
     statusEl.textContent = `Level ${state.level} - Tap to continue`;
@@ -375,7 +383,7 @@ function applyPowerUp(type) {
   switch (type) {
     case 'expand':
       if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
-      paddle.width = Math.min(paddle.width * POWER_UP_PADDLE_EXPAND, state.width * 0.4);
+      paddle.width = Math.min(getDefaultPaddleWidth() * POWER_UP_PADDLE_EXPAND, state.width * 0.4);
       activePowerUps.paddle = setTimeout(() => {
         paddle.width = getDefaultPaddleWidth();
         activePowerUps.paddle = null;
@@ -383,7 +391,7 @@ function applyPowerUp(type) {
       break;
     case 'shrink':
       if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
-      paddle.width = Math.max(paddle.width * POWER_UP_PADDLE_SHRINK, MIN_PADDLE_WIDTH);
+      paddle.width = Math.max(getDefaultPaddleWidth() * POWER_UP_PADDLE_SHRINK, MIN_PADDLE_WIDTH);
       activePowerUps.paddle = setTimeout(() => {
         paddle.width = getDefaultPaddleWidth();
         activePowerUps.paddle = null;
@@ -391,7 +399,7 @@ function applyPowerUp(type) {
       break;
     case 'speedUp':
       if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
-      ball.speed *= POWER_UP_SPEED_UP;
+      ball.speed = calculateBallSpeed() * POWER_UP_SPEED_UP;
       activePowerUps.speed = setTimeout(() => {
         ball.speed = calculateBallSpeed();
         activePowerUps.speed = null;
@@ -399,7 +407,7 @@ function applyPowerUp(type) {
       break;
     case 'slowDown':
       if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
-      ball.speed *= POWER_UP_SPEED_DOWN;
+      ball.speed = calculateBallSpeed() * POWER_UP_SPEED_DOWN;
       activePowerUps.speed = setTimeout(() => {
         ball.speed = calculateBallSpeed();
         activePowerUps.speed = null;
@@ -496,8 +504,7 @@ function drawBricks() {
   }
 }
 
-function drawPowerUps() {
-  const now = Date.now();
+function drawPowerUps(now) {
   for (const powerUp of powerUps) {
     ctx.save();
     ctx.shadowColor = `hsla(${powerUp.hue}, 80%, 60%, 0.9)`;
@@ -580,6 +587,7 @@ function loop(timestamp) {
   if (!state.running) return;
   const dt = Math.min(0.02, (timestamp - state.lastTime) / 1000 || 0.016);
   state.lastTime = timestamp;
+  const now = Date.now();
 
   updatePaddle();
   updateBall(dt);
@@ -592,7 +600,7 @@ function loop(timestamp) {
   drawTitle();
   drawPaddle();
   drawBall();
-  drawPowerUps();
+  drawPowerUps(now);
   drawParticles();
   drawComboText();
 
