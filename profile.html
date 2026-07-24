@@ -6,15 +6,162 @@
     <title>Profile</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css" />
+    <style>
+      /* Profile page only: let the content scroll over the fixed liquid canvas. */
+      html, body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
+      #stage { z-index: 0; }
+
+      .profile {
+        position: relative;
+        z-index: 2;
+        max-width: 780px;
+        margin: 0 auto;
+        padding: clamp(4rem, 10vh, 7rem) clamp(1.2rem, 5vw, 2.5rem) 4rem;
+        font-family: "Space Grotesk", "Rajdhani", sans-serif;
+        color: rgba(224, 245, 255, 0.92);
+      }
+
+      .profile-hero { text-align: center; margin-bottom: clamp(2rem, 6vh, 3.5rem); }
+      .profile-hero h1 {
+        font-family: "Orbitron", monospace;
+        font-weight: 900;
+        font-size: clamp(2.4rem, 9vw, 4.6rem);
+        letter-spacing: 0.04em;
+        color: rgba(224, 255, 255, 0.96);
+        text-shadow:
+          0 2px 14px rgba(0, 12, 28, 0.7),
+          0 0 30px rgba(150, 255, 255, 0.5),
+          0 0 60px rgba(100, 200, 255, 0.3);
+        margin-bottom: 0.7rem;
+        line-height: 1.05;
+      }
+      .profile-hero .role {
+        font-family: "Rajdhani", sans-serif; font-weight: 600;
+        font-size: clamp(1rem, 3.2vw, 1.35rem); letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(140, 225, 255, 0.9); text-shadow: 0 0 18px rgba(120, 200, 255, 0.4);
+      }
+      .profile-hero .loc { margin-top: 0.5rem; font-size: 0.95rem; color: rgba(190, 225, 255, 0.7); letter-spacing: 0.05em; }
+
+      .card {
+        background: rgba(8, 16, 30, 0.55);
+        -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+        border: 1px solid rgba(120, 200, 255, 0.22);
+        border-radius: 14px;
+        padding: clamp(1.2rem, 3.5vw, 2rem);
+        margin-bottom: clamp(1rem, 3vh, 1.6rem);
+        box-shadow: 0 10px 40px rgba(0, 10, 25, 0.4), inset 0 0 30px rgba(80, 160, 255, 0.05);
+      }
+      .card h2 {
+        font-family: "Orbitron", monospace; font-weight: 700;
+        font-size: clamp(0.9rem, 2.6vw, 1.1rem); letter-spacing: 0.22em; text-transform: uppercase;
+        color: rgba(150, 235, 255, 0.95); text-shadow: 0 0 18px rgba(120, 200, 255, 0.4);
+        margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem;
+      }
+      .card h2::before {
+        content: ""; width: 10px; height: 10px; border-radius: 50%; flex: none;
+        background: rgba(120, 220, 255, 0.9); box-shadow: 0 0 12px rgba(120, 220, 255, 0.9);
+      }
+      .card p { line-height: 1.75; margin-bottom: 0.8rem; font-size: clamp(0.95rem, 2.3vw, 1.05rem); }
+      .card p:last-child { margin-bottom: 0; }
+      .card ul { list-style: none; display: grid; gap: 0.75rem; }
+      .card li { position: relative; padding-left: 1.5rem; line-height: 1.65; font-size: clamp(0.95rem, 2.3vw, 1.05rem); }
+      .card li::before { content: "\25B9"; position: absolute; left: 0; color: rgba(120, 220, 255, 0.9); }
+      .card strong { color: rgba(200, 245, 255, 0.98); font-weight: 600; }
+
+      .skill-group { margin-bottom: 1rem; }
+      .skill-group:last-child { margin-bottom: 0; }
+      .skill-group .label {
+        font-family: "Rajdhani", sans-serif; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+        font-size: 0.78rem; color: rgba(150, 210, 255, 0.75); margin-bottom: 0.55rem;
+      }
+      .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .chip {
+        font-size: 0.85rem; padding: 0.32rem 0.75rem; border-radius: 999px; white-space: nowrap;
+        background: rgba(60, 140, 230, 0.12); border: 1px solid rgba(120, 200, 255, 0.28);
+        color: rgba(210, 240, 255, 0.92);
+      }
+
+      .links { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+      .links a {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.55rem 1rem; border-radius: 10px;
+        border: 1px solid rgba(120, 200, 255, 0.3); background: rgba(10, 22, 40, 0.5);
+        color: rgba(210, 240, 255, 0.95); text-decoration: none; font-weight: 500;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      }
+      .links a:hover { border-color: rgba(150, 235, 255, 0.7); box-shadow: 0 0 18px rgba(120, 200, 255, 0.35); transform: translateY(-1px); }
+
+      .profile-foot { text-align: center; margin-top: 2rem; font-size: 0.85rem; color: rgba(180, 215, 255, 0.6); font-family: "Rajdhani", sans-serif; letter-spacing: 0.08em; }
+      .profile-foot a { color: inherit; text-decoration: none; }
+      .profile-foot a:hover { color: rgba(150, 235, 255, 0.9); }
+    </style>
   </head>
   <body>
-    <div id="name-container">
-      <div id="name-text"></div>
-    </div>
-    <div id="intro-text"></div>
-    <canvas id="stage" aria-label="Interactive profile canvas"></canvas>
+    <canvas id="stage" aria-label="Interactive profile background"></canvas>
+    <main class="profile">
+      <header class="profile-hero">
+        <h1>Kota Konishi</h1>
+        <div class="role">IT Engineer &middot; AI-Driven Development</div>
+        <div class="loc">Based in Japan</div>
+      </header>
+
+      <section class="card">
+        <h2>About</h2>
+        <p>I'm an IT engineer based in Japan, focused on bringing AI into everyday software development. My main work is driving the adoption of GitHub Copilot across teams and reshaping how we design, build, and ship &mdash; turning traditional development workflows into faster, AI-augmented ones.</p>
+        <p>I also have hands-on experience in monitoring and server operations, so I care about building software that is not only quick to develop but also reliable to run.</p>
+      </section>
+
+      <section class="card">
+        <h2>Focus</h2>
+        <ul>
+          <li>Driving <strong>GitHub Copilot</strong> adoption and enablement across development teams</li>
+          <li>Designing <strong>AI-driven development</strong> workflows &mdash; agents, prompt engineering, MCP, and RAG</li>
+          <li>Building web apps and internal tools with Python / TypeScript and React / Vue</li>
+          <li>Monitoring and server operations with Zabbix, Grafana, and Prometheus</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Skills</h2>
+        <div class="skill-group">
+          <div class="label">Languages</div>
+          <div class="chips"><span class="chip">Python</span><span class="chip">JavaScript</span><span class="chip">TypeScript</span><span class="chip">Java</span><span class="chip">PHP</span><span class="chip">Rust</span><span class="chip">SQL</span></div>
+        </div>
+        <div class="skill-group">
+          <div class="label">Frontend</div>
+          <div class="chips"><span class="chip">React</span><span class="chip">Vue</span><span class="chip">Three.js</span><span class="chip">HTML</span><span class="chip">CSS</span></div>
+        </div>
+        <div class="skill-group">
+          <div class="label">Backend</div>
+          <div class="chips"><span class="chip">Flask</span><span class="chip">Django</span></div>
+        </div>
+        <div class="skill-group">
+          <div class="label">AI-Driven Dev</div>
+          <div class="chips"><span class="chip">GitHub Copilot</span><span class="chip">Copilot CLI</span><span class="chip">LLMs</span><span class="chip">AI Agents</span><span class="chip">MCP</span><span class="chip">Prompt Engineering</span><span class="chip">RAG</span></div>
+        </div>
+        <div class="skill-group">
+          <div class="label">DevOps &amp; Infra</div>
+          <div class="chips"><span class="chip">Git</span><span class="chip">GitHub Actions</span><span class="chip">Docker</span><span class="chip">Linux</span><span class="chip">RHEL</span><span class="chip">Windows</span></div>
+        </div>
+        <div class="skill-group">
+          <div class="label">Monitoring &amp; Data</div>
+          <div class="chips"><span class="chip">Zabbix</span><span class="chip">Grafana</span><span class="chip">Prometheus</span><span class="chip">NumPy</span><span class="chip">Pandas</span><span class="chip">Parasoft Jtest</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Links</h2>
+        <div class="links">
+          <a href="https://github.com/cw-konishi" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </section>
+
+      <footer class="profile-foot">
+        <a href="index.html">&larr; Home</a> &middot; &copy; Kota Konishi
+      </footer>
+    </main>
     <script src="js/profile.js"></script>
     <script>
       (function() {

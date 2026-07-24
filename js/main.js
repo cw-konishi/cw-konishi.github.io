@@ -7,21 +7,31 @@ const SETTINGS = {
   // Skill labels that float around the name.
   skills: [
    // Languages
-  { label: "Python", weight: 1.1 },
-  { label: "JavaScript", weight: 1.4 },
-  { label: "TypeScript", weight: 1.2 },
+  { label: "Python", weight: 1.3 },
+  { label: "JavaScript", weight: 1.3 },
+  { label: "TypeScript", weight: 1.4 },
   { label: "HTML", weight: 0.9 },
   { label: "CSS", weight: 0.9 },
-  { label: "Java", weight: 1.1 },
-  { label: "PHP", weight: 1.0 },
+  { label: "Java", weight: 1.0 },
+  { label: "PHP", weight: 0.9 },
   { label: "Rust", weight: 0.9 },
   { label: "SQL", weight: 0.8 },
 
+  // AI-driven development
+  { label: "GitHub Copilot", weight: 2.0 },
+  { label: "AI-driven Dev", weight: 2.0 },
+  { label: "GitHub Copilot CLI", weight: 1.7 },
+  { label: "AI Agents", weight: 1.6 },
+  { label: "LLM", weight: 1.5 },
+  { label: "MCP", weight: 1.4 },
+  { label: "Prompt Engineering", weight: 1.3 },
+  { label: "RAG", weight: 1.2 },
+
   // Frameworks / Libraries
-  { label: "Flask", weight: 1.2 },
-  { label: "Three.js", weight: 1.6 },
   { label: "React", weight: 1.3 },
-  { label: "Vue", weight: 1.1 },
+  { label: "Three.js", weight: 1.3 },
+  { label: "Vue", weight: 1.0 },
+  { label: "Flask", weight: 1.1 },
   { label: "Django", weight: 1.0 },
 
   // Development / CI/CD
@@ -31,8 +41,6 @@ const SETTINGS = {
   { label: "Linux", weight: 0.9 },
   { label: "Windows", weight: 0.8 },
   { label: "VSCode", weight: 0.9 },
-  { label: "GitHub Copilot", weight: 1.6 },
-  { label: "AI-driven Dev", weight: 1.6 },
 
   // Data / Testing
   { label: "NumPy", weight: 0.9 },
@@ -61,6 +69,7 @@ const skillParticles = [];
 const offscreen = document.createElement("canvas");
 const offCtx = offscreen.getContext("2d");
 let tick = 0;
+let labelScale = 1;
 
 function resizeCanvas() {
   const { width, height } = canvas.getBoundingClientRect();
@@ -140,54 +149,35 @@ function buildParticles() {
     }
   }
 
-  // Place skill labels around the name area.
+  // Place skill labels around the name with an even golden-angle spread, then
+  // relax overlaps so labels no longer stack on top of each other.
   skillParticles.length = 0;
-  const ringRadius = Math.min(width, height) * 0.05;
   const centerX = width / 2;
   const centerY = height / 2;
-  const nameBounds = {
-    x: centerX - textWidth / 2,
-    y: centerY - textHeight / 2,
-    w: textWidth,
-    h: textHeight,
-  };
-  const namePadding = Math.max(18, fontSize * 0.12);
-  const minRadius = Math.max(textWidth, textHeight) * 0.6 + namePadding;
-  const canvasPadding = 32;
+  const nameHalfW = textWidth / 2;
+  const nameHalfH = textHeight / 2;
+  const namePadding = Math.max(22, fontSize * 0.16);
+  const canvasPadding = 30;
   const skillList = SETTINGS.skills.map((skill) =>
     typeof skill === "string"
       ? { label: skill, weight: 1 }
       : { label: skill.label, weight: skill.weight ?? 1 }
   );
 
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const maxRadius = Math.min(width, height) * 0.62;
+  // Scale label type down on smaller canvases so even the widest labels fit.
+  labelScale = Math.min(1, Math.min(width, height) / 820);
   skillList.forEach((skill, index) => {
-    let x = centerX;
-    let y = centerY;
-    const size = 16 + skill.weight * 12 + Math.random() * 2;
+    const size = (16 + skill.weight * 12) * labelScale;
     offCtx.font = `600 ${size}px "Space Grotesk", sans-serif`;
-    const labelMetrics = offCtx.measureText(skill.label);
-    const labelWidth = labelMetrics.width;
-    const labelHeight =
-      labelMetrics.actualBoundingBoxAscent +
-      labelMetrics.actualBoundingBoxDescent;
-
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      const angle = (index / skillList.length) * Math.PI * 2 + Math.random() * 0.4;
-      const radius =
-        Math.max(minRadius, ringRadius) + Math.random() * ringRadius * 0.4;
-      x = centerX + Math.cos(angle) * radius;
-      y = centerY + Math.sin(angle) * radius * 0.7;
-
-      // Keep labels inside the canvas bounds.
-      const minX = canvasPadding + labelWidth / 2;
-      const maxX = width - canvasPadding - labelWidth / 2;
-      const minY = canvasPadding + labelHeight / 2;
-      const maxY = height - canvasPadding - labelHeight / 2;
-      x = Math.min(Math.max(x, minX), maxX);
-      y = Math.min(Math.max(y, minY), maxY);
-      break;
-    }
-
+    const labelWidth = offCtx.measureText(skill.label).width;
+    const labelHeight = size;
+    const frac = (index + 0.5) / skillList.length;
+    const angle = index * goldenAngle;
+    const radius = Math.sqrt(frac) * maxRadius;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius * 0.82;
     skillParticles.push({
       label: skill.label,
       x,
@@ -198,8 +188,57 @@ function buildParticles() {
       vy: 0,
       weight: skill.weight,
       size,
+      w: labelWidth,
+      h: labelHeight,
     });
   });
+
+  // Relaxation (build-time only): separate overlapping labels and eject any
+  // that fall over the name, keeping everything inside the canvas.
+  const gapX = 24 * labelScale;
+  const gapY = 16 * labelScale;
+  for (let iter = 0; iter < 160; iter += 1) {
+    for (let i = 0; i < skillParticles.length; i += 1) {
+      const a = skillParticles[i];
+      for (let j = i + 1; j < skillParticles.length; j += 1) {
+        const b = skillParticles[j];
+        const dx = b.ox - a.ox;
+        const dy = b.oy - a.oy;
+        const penX = (a.w + b.w) / 2 + gapX - Math.abs(dx);
+        const penY = (a.h + b.h) / 2 + gapY - Math.abs(dy);
+        if (penX > 0 && penY > 0) {
+          if (penX < penY) {
+            const push = ((dx < 0 ? -1 : 1) * penX) / 2;
+            a.ox -= push;
+            b.ox += push;
+          } else {
+            const push = ((dy < 0 ? -1 : 1) * penY) / 2;
+            a.oy -= push;
+            b.oy += push;
+          }
+        }
+      }
+    }
+    for (const s of skillParticles) {
+      // Eject vertically out of the name's bounding box (the band is wide but
+      // short) so labels frame the name above and below it.
+      const penX = nameHalfW + namePadding + s.w / 2 - Math.abs(s.ox - centerX);
+      const penY = nameHalfH + namePadding + s.h / 2 - Math.abs(s.oy - centerY);
+      if (penX > 0 && penY > 0) {
+        s.oy += (s.oy < centerY ? -1 : 1) * penY;
+      }
+      const minX = canvasPadding + s.w / 2;
+      const maxX = width - canvasPadding - s.w / 2;
+      const minY = canvasPadding + s.h / 2;
+      const maxY = height - canvasPadding - s.h / 2;
+      s.ox = Math.min(Math.max(s.ox, minX), maxX);
+      s.oy = Math.min(Math.max(s.oy, minY), maxY);
+    }
+  }
+  for (const s of skillParticles) {
+    s.x = s.ox;
+    s.y = s.oy;
+  }
 }
 
 function drawParticles() {
@@ -207,10 +246,22 @@ function drawParticles() {
 
   ctx.clearRect(0, 0, width, height);
 
+  // Soft radial glow behind the name for a lit, premium feel (one cheap fill).
+  const glowRadius = Math.min(width, height) * 0.5;
+  const glow = ctx.createRadialGradient(
+    width / 2, height / 2, 0,
+    width / 2, height / 2, glowRadius
+  );
+  glow.addColorStop(0, "rgba(70, 150, 255, 0.10)");
+  glow.addColorStop(0.55, "rgba(60, 120, 220, 0.035)");
+  glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
+
   const repelRadius = Math.min(width, height) * 0.22;
   const attractBand = repelRadius * 0.55;
 
-  ctx.fillStyle = "rgba(90, 162, 255, 0.9)";
+  ctx.fillStyle = "rgba(120, 195, 255, 0.92)";
   for (const particle of particles) {
     const dx = particle.x - pointer.x;
     const dy = particle.y - pointer.y;
@@ -276,46 +327,62 @@ function drawParticles() {
     skill.vx *= 0.88;
     skill.vy *= 0.88;
     
-    // Wave cascade motion: each skill floats with a staggered phase.
+    // Wave cascade motion: each skill floats with a staggered phase. The wave
+    // is applied as a render-time offset (rx/ry below) rather than mutating the
+    // stored position, so labels never drift off-canvas on narrow screens.
     const wavePhase = (skill.ox + skill.oy) * 0.008;
-    const cascadeWave = Math.sin(tick * 1.2 + wavePhase) * 14;
-    const cascadeWaveX = Math.cos(tick * 0.9 + wavePhase + 0.3) * 11;
+    const cascadeWave = Math.sin(tick * 1.2 + wavePhase) * 9 * labelScale;
+    const cascadeWaveX = Math.cos(tick * 0.9 + wavePhase + 0.3) * 7 * labelScale;
     const cascadeScale = 0.95 + Math.sin(tick * 1.2 + wavePhase + 0.5) * 0.05;
-    
-    skill.x += skill.vx + cascadeWaveX;
-    skill.y += skill.vy + cascadeWave;
+
+    skill.x += skill.vx;
+    skill.y += skill.vy;
     skill.scale = cascadeScale;
+
+    const rx = Math.min(Math.max(skill.x + cascadeWaveX, skill.w / 2 + 6), width - skill.w / 2 - 6);
+    const ry = Math.min(Math.max(skill.y + cascadeWave, skill.h / 2 + 6), height - skill.h / 2 - 6);
 
     const influence = pointer.active
       ? Math.max(0, 1 - distance / repelRadius)
-      : 0.15;
+      : 0.05;
     const split = (8 + Math.sin(tick + skill.ox * 0.01) * 3) *
       (influence * (2 - skill.weight * 0.6));
     const offsetX = (dx / distance) * split;
     const offsetY = (dy / distance) * split;
 
     ctx.font = `600 ${skill.size}px "Space Grotesk", sans-serif`;
-    const opacity = 0.65 + skill.weight * 0.25;
-    
+    const opacity = Math.min(1, 0.62 + skill.weight * 0.24);
+
+    // Cool blue-gray for minor skills, brightening toward cyan for the key
+    // ones, so the tech stack reads as a hierarchy while staying on-palette.
+    const wN = Math.min(1, Math.max(0, (skill.weight - 0.8) / 1.2));
+    const cr = Math.round(120 + wN * 20);
+    const cg = Math.round(150 + wN * 72);
+    const cb = Math.round(192 + wN * 63);
+
     // Apply wave cascade scale with context transform.
     ctx.save();
-    ctx.translate(skill.x, skill.y);
+    ctx.translate(rx, ry);
     ctx.scale(skill.scale || 1, skill.scale || 1);
-    ctx.translate(-skill.x, -skill.y);
-    
+    ctx.translate(-rx, -ry);
+
     // Draw a circle around the skill based on its weight.
-    const circleRadius = 18 + skill.weight * 20;
-    ctx.strokeStyle = `rgba(110, 115, 130, ${opacity * 0.5})`;
-    ctx.lineWidth = 1.5;
+    const circleRadius = 16 + skill.weight * 14;
+    ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${opacity * 0.26})`;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(skill.x, skill.y, circleRadius, 0, Math.PI * 2);
+    ctx.arc(rx, ry, circleRadius, 0, Math.PI * 2);
     ctx.stroke();
-    
-    ctx.fillStyle = `rgba(110, 115, 130, ${opacity * 0.85})`;
-    ctx.fillText(skill.label, skill.x + offsetX, skill.y + offsetY);
-    ctx.fillStyle = `rgba(110, 115, 130, ${opacity + 0.05})`;
-    ctx.fillText(skill.label, skill.x - offsetX, skill.y - offsetY);
-    
+
+    // Subtle glow that scales with importance.
+    ctx.shadowColor = `rgba(${cr}, ${cg}, ${cb}, ${0.35 + wN * 0.4})`;
+    ctx.shadowBlur = 6 + wN * 12;
+
+    ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${opacity * 0.85})`;
+    ctx.fillText(skill.label, rx + offsetX, ry + offsetY);
+    ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${opacity})`;
+    ctx.fillText(skill.label, rx - offsetX, ry - offsetY);
+
     ctx.restore();
   }
 
@@ -325,6 +392,17 @@ function drawParticles() {
 resizeCanvas();
 buildParticles();
 drawParticles();
+
+// The name and skill labels are rasterized with "Space Grotesk". Rebuild once the
+// web font has loaded so the particle shapes and labels match the intended typeface.
+if (document.fonts && document.fonts.load) {
+  Promise.all([
+    document.fonts.load('700 100px "Space Grotesk"'),
+    document.fonts.load('600 40px "Space Grotesk"'),
+  ])
+    .then(() => buildParticles())
+    .catch(() => {});
+}
 
 window.addEventListener("resize", () => {
   resizeCanvas();

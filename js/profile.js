@@ -1,17 +1,61 @@
 const canvas = document.querySelector("#stage");
 const ctx = canvas.getContext("2d");
 
-// Self-introduction settings
-const SETTINGS = {
-  name: "Kota Konishi",
-  introduction: "I'm a IT engineer based in Japan.\nI'm interested in AI-driven development, working on GitHub Copilot adoption and transforming\ndevelopment workflows.\nI also have experience with Zabbix for monitoring and server operations."
-};
-
 const blobs = [];
 const IS_MOBILE = window.innerWidth <= 768;
-const BLOB_COUNT = IS_MOBILE ? 0 : 400;
+const BLOB_COUNT = IS_MOBILE ? 0 : 200;
+const PREFERS_REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-let frameCount = 0;
+// Cap device pixel ratio: the blob field is heavily blurred, so extra pixels are wasted.
+const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+// Render the blob field into a low-resolution buffer, then upscale to the main canvas.
+// This is the key optimization: the expensive blur runs on ~10x fewer pixels.
+const RENDER_SCALE = 0.3;
+const LOW_BLUR = Math.round(80 * RENDER_SCALE);
+
+// Low-resolution offscreen buffers used by the desktop liquid renderer.
+const blobLayer = document.createElement("canvas");
+const blobCtx = blobLayer.getContext("2d");
+const blurLayer = document.createElement("canvas");
+const blurCtx = blurLayer.getContext("2d");
+let lowW = 1;
+let lowH = 1;
+
+// Pre-baked blob sprites (radial gradients), built once and reused every frame
+// so we never allocate a gradient per blob per frame.
+const HUE_MIN = 180;
+const HUE_MAX = 220;
+const SPRITE_BUCKETS = 8;
+const SPRITE_SIZE = 128;
+const blobSprites = [];
+
+function buildBlobSprites() {
+  blobSprites.length = 0;
+  for (let i = 0; i < SPRITE_BUCKETS; i += 1) {
+    const hue = HUE_MIN + ((HUE_MAX - HUE_MIN) * i) / (SPRITE_BUCKETS - 1);
+    const sprite = document.createElement("canvas");
+    sprite.width = SPRITE_SIZE;
+    sprite.height = SPRITE_SIZE;
+    const g = sprite.getContext("2d");
+    const r = SPRITE_SIZE / 2;
+    const gradient = g.createRadialGradient(r, r, 0, r, r, r);
+    gradient.addColorStop(0, `hsla(${hue}, 80%, 65%, 0.9)`);
+    gradient.addColorStop(0.3, `hsla(${hue}, 75%, 55%, 0.85)`);
+    gradient.addColorStop(0.6, `hsla(${hue}, 70%, 45%, 0.6)`);
+    gradient.addColorStop(1, `hsla(${hue}, 65%, 35%, 0)`);
+    g.fillStyle = gradient;
+    g.beginPath();
+    g.arc(r, r, r, 0, Math.PI * 2);
+    g.fill();
+    blobSprites.push(sprite);
+  }
+}
+
+function spriteForHue(hue) {
+  const t = (hue - HUE_MIN) / (HUE_MAX - HUE_MIN);
+  const idx = Math.max(0, Math.min(SPRITE_BUCKETS - 1, Math.round(t * (SPRITE_BUCKETS - 1))));
+  return blobSprites[idx];
+}
 
 const pointer = {
   x: 0,
@@ -103,26 +147,28 @@ class Blob {
   }
 
   display() {
-    const alphaScale = IS_MOBILE ? 1.0 : 1;
-    const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
-    gradient.addColorStop(0, `hsla(${this.hue}, 80%, 65%, ${0.9 * alphaScale})`);
-    gradient.addColorStop(0.3, `hsla(${this.hue}, 75%, 55%, ${0.85 * alphaScale})`);
-    gradient.addColorStop(0.6, `hsla(${this.hue}, 70%, 45%, ${0.7 * alphaScale})`);
-    gradient.addColorStop(1, `hsla(${this.hue}, 65%, 35%, ${0.4 * alphaScale})`);
-    
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-    ctx.fill();
+    // Draw a pre-baked sprite into the low-res buffer (no per-frame gradient allocation).
+    const sprite = spriteForHue(this.hue);
+    const d = this.size * 2 * RENDER_SCALE;
+    const sx = this.x * RENDER_SCALE - d / 2;
+    const sy = this.y * RENDER_SCALE - d / 2;
+    blobCtx.drawImage(sprite, sx, sy, d, d);
   }
 }
 
 function resizeCanvas() {
   const { width, height } = canvas.getBoundingClientRect();
-  const scale = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(width * scale);
-  canvas.height = Math.floor(height * scale);
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  canvas.width = Math.floor(width * DPR);
+  canvas.height = Math.floor(height * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Size the low-resolution liquid buffers.
+  lowW = Math.max(1, Math.round(width * RENDER_SCALE));
+  lowH = Math.max(1, Math.round(height * RENDER_SCALE));
+  blobLayer.width = lowW;
+  blobLayer.height = lowH;
+  blurLayer.width = lowW;
+  blurLayer.height = lowH;
 }
 
 function initBlobs(width, height) {
@@ -233,22 +279,9 @@ function renderMobileLiquid(width, height) {
   ctx.globalCompositeOperation = "source-over";
 }
 
-function animate() {
-  const { width, height } = canvas.getBoundingClientRect();
-
-  if (IS_MOBILE) {
-    renderMobileLiquid(width, height);
-    requestAnimationFrame(animate);
-    return;
-  }
-
-  ctx.clearRect(0, 0, width, height);
-  
-  // Apply extreme blur for seamless liquid (much stronger on mobile)
-  const blurSize = IS_MOBILE ? 250 : 80;
-  ctx.filter = `blur(${blurSize}px)`;
-
-  // Update and display blobs (smooth animation on mobile - no frame skip)
+function renderDesktopLiquid(width, height) {
+  // 1) Draw all blobs sharp into the low-res buffer.
+  blobCtx.clearRect(0, 0, lowW, lowH);
   for (const blob of blobs) {
     if (pointer.active) {
       blob.pushFromCursor(pointer.x, pointer.y);
@@ -257,77 +290,69 @@ function animate() {
     blob.update(width, height);
     blob.display();
   }
-  
-  ctx.filter = "none";
 
-  requestAnimationFrame(animate);
+  // 2) Blur the low-res buffer once. Cheap: runs on RENDER_SCALE^2 fewer pixels
+  //    than the previous per-blob full-resolution blur(80px).
+  blurCtx.clearRect(0, 0, lowW, lowH);
+  blurCtx.filter = `blur(${LOW_BLUR}px)`;
+  blurCtx.drawImage(blobLayer, 0, 0);
+  blurCtx.filter = "none";
+
+  // 3) Upscale to the main canvas; bilinear smoothing completes the liquid look.
+  ctx.clearRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(blurLayer, 0, 0, lowW, lowH, 0, 0, width, height);
+}
+
+function renderFrame() {
+  const { width, height } = canvas.getBoundingClientRect();
+  if (IS_MOBILE) {
+    renderMobileLiquid(width, height);
+  } else {
+    renderDesktopLiquid(width, height);
+  }
+}
+
+let rafId = null;
+
+function loop() {
+  renderFrame();
+  rafId = requestAnimationFrame(loop);
+}
+
+function startLoop() {
+  if (rafId === null) {
+    rafId = requestAnimationFrame(loop);
+  }
+}
+
+function stopLoop() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
 }
 
 resizeCanvas();
+buildBlobSprites();
 const { width, height } = canvas.getBoundingClientRect();
 initBlobs(width, height);
 
-// Setup name container with neon decoration
-const nameContainer = document.querySelector("#name-container");
-nameContainer.style.cssText = `
-  position: fixed;
-  top: ${IS_MOBILE ? '30%' : '35%'};
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: ${IS_MOBILE ? '4vw 5vw' : '3vw 4vw'};
-  border: 2px solid rgba(150, 255, 255, 0.4);
-  border-radius: 8px;
-  box-shadow: 
-    0 0 20px rgba(100, 200, 255, 0.3),
-    0 0 40px rgba(100, 200, 255, 0.2),
-    inset 0 0 30px rgba(100, 200, 255, 0.1);
-  backdrop-filter: blur(2px);
-  pointer-events: none;
-  z-index: 0;
-`;
-
-// Setup name text
-const nameText = document.querySelector("#name-text");
-nameText.textContent = SETTINGS.name;
-nameText.style.cssText = `
-  font-size: clamp(3rem, 12vw, 15vw);
-  font-weight: 900;
-  color: rgba(220, 255, 255, 0.9);
-  text-shadow: 
-    0 0 30px rgba(150, 255, 255, 0.6), 
-    0 0 60px rgba(100, 200, 255, 0.4),
-    0 0 90px rgba(100, 200, 255, 0.2);
-  font-family: 'Orbitron', monospace;
-  white-space: nowrap;
-  letter-spacing: 0.05em;
-  -webkit-text-stroke: 1px rgba(150, 255, 255, 0.2);
-`;
-
-// Setup introduction text
-const introText = document.querySelector("#intro-text");
-introText.textContent = SETTINGS.introduction;
-introText.style.cssText = `
-  position: fixed;
-  bottom: ${IS_MOBILE ? '25%' : '15%'};
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: ${IS_MOBILE ? '85vw' : '60vw'};
-  max-height: ${IS_MOBILE ? '30vh' : '25vh'};
-  overflow: hidden;
-  font-size: ${IS_MOBILE ? 'clamp(0.8rem, 3.5vw, 1rem)' : '2vw'};
-  font-weight: 500;
-  line-height: 1.8;
-  color: rgba(200, 240, 255, 0.75);
-  text-shadow: 0 0 20px rgba(150, 255, 255, 0.3);
-  pointer-events: none;
-  z-index: -1;
-  font-family: 'Rajdhani', sans-serif;
-  white-space: pre-line;
-  text-align: left;
-  letter-spacing: 0.02em;
-`;
-
-animate();
+if (PREFERS_REDUCED_MOTION) {
+  // Respect reduced-motion: render a single static frame, no animation loop.
+  renderFrame();
+} else {
+  startLoop();
+  // Pause rendering while the tab is hidden to save CPU/GPU.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopLoop();
+    } else {
+      startLoop();
+    }
+  });
+}
 
 window.addEventListener("resize", () => {
   resizeCanvas();
@@ -343,6 +368,10 @@ window.addEventListener("resize", () => {
   
   if (blobs.length === 0) {
     initBlobs(width, height);
+  }
+
+  if (PREFERS_REDUCED_MOTION) {
+    renderFrame();
   }
 });
 
