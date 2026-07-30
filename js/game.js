@@ -2,6 +2,7 @@ const canvas = document.querySelector("#stage");
 const ctx = canvas.getContext("2d");
 const scoreEl = document.querySelector("#score");
 const livesEl = document.querySelector("#lives");
+const levelEl = document.querySelector("#level");
 const statusEl = document.querySelector("#status-text");
 
 const state = {
@@ -14,6 +15,9 @@ const state = {
   lives: 3,
   gameOver: false,
   pointerX: null,
+  combo: 0,
+  maxCombo: 0,
+  level: 1,
 };
 
 const title = {
@@ -41,10 +45,21 @@ const ball = {
   radius: 10,
   launched: false,
   speed: 420,
+  baseSpeed: 420,
 };
 
 let bricks = [];
 const particles = [];
+const powerUps = [];
+const comboText = { text: "", x: 0, y: 0, life: 0, scale: 1 };
+let activePowerUps = { paddle: null, speed: null };
+
+// Power-up constants
+const POWER_UP_PADDLE_EXPAND = 1.3;
+const POWER_UP_PADDLE_SHRINK = 0.7;
+const POWER_UP_SPEED_UP = 1.25;
+const POWER_UP_SPEED_DOWN = 0.75;
+const LEVEL_SPEED_INCREMENT = 40;
 
 function resizeCanvas() {
   const { width, height } = canvas.getBoundingClientRect();
@@ -56,14 +71,15 @@ function resizeCanvas() {
   state.height = height;
 
   const isMobile = width < 720;
-  paddle.width = isMobile ? width * 0.35 : width * 0.18;
+  paddle.width = getDefaultPaddleWidth();
   paddle.height = isMobile ? 18 : 16;
   paddle.y = height - (isMobile ? 80 : 70);
   paddle.x = (width - paddle.width) / 2;
   paddle.targetX = paddle.x;
 
   ball.radius = isMobile ? 10 : 9;
-  ball.speed = isMobile ? 360 : 440;
+  ball.baseSpeed = isMobile ? 360 : 440;
+  ball.speed = ball.baseSpeed;
 
   title.size = Math.max(40, Math.min(120, width * 0.14));
   title.x = width / 2;
@@ -91,7 +107,16 @@ function buildBricks() {
       const x = marginX + col * (brickWidth + gap);
       const y = topOffset + row * (brickHeight + gap);
       const hue = 185 + row * 7;
-      bricks.push({ x, y, width: brickWidth, height: brickHeight, alive: true, hue });
+      
+      // Special bricks: golden bricks worth more points (every 7th brick)
+      const isSpecial = (row * cols + col) % 7 === 0;
+      const points = isSpecial ? 50 : 10;
+      
+      bricks.push({ 
+        x, y, width: brickWidth, height: brickHeight, 
+        alive: true, hue: isSpecial ? 45 : hue, 
+        special: isSpecial, points 
+      });
     }
   }
 }
@@ -106,10 +131,15 @@ function resetBall(fullReset) {
     state.score = 0;
     state.lives = 3;
     state.gameOver = false;
+    state.combo = 0;
+    state.maxCombo = 0;
+    state.level = 1;
+    ball.speed = ball.baseSpeed;
     statusEl.textContent = "Tap or click to launch";
   }
   scoreEl.textContent = state.score;
   livesEl.textContent = state.lives;
+  levelEl.textContent = state.level;
 }
 
 function launchBall() {
@@ -121,8 +151,8 @@ function launchBall() {
   statusEl.textContent = "";
 }
 
-function spawnParticles(x, y, hue) {
-  for (let i = 0; i < 10; i += 1) {
+function spawnParticles(x, y, hue, count = 10) {
+  for (let i = 0; i < count; i += 1) {
     particles.push({
       x,
       y,
@@ -132,6 +162,27 @@ function spawnParticles(x, y, hue) {
       hue,
     });
   }
+}
+
+function spawnPowerUp(x, y) {
+  const types = ['expand', 'shrink', 'speedUp', 'slowDown'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  powerUps.push({
+    x,
+    y,
+    vy: 80,
+    type,
+    radius: 12,
+    hue: type === 'expand' ? 120 : type === 'shrink' ? 0 : type === 'speedUp' ? 280 : 180,
+  });
+}
+
+function showComboText(x, y, combo) {
+  comboText.text = `${combo}x COMBO!`;
+  comboText.x = x;
+  comboText.y = y;
+  comboText.life = 1.5;
+  comboText.scale = 1;
 }
 
 function updatePaddle() {
@@ -167,10 +218,11 @@ function updateBall(dt) {
 
   if (ball.y - ball.radius > state.height) {
     state.lives -= 1;
+    state.combo = 0; // Reset combo on ball loss
     livesEl.textContent = state.lives;
     if (state.lives <= 0) {
       state.gameOver = true;
-      statusEl.textContent = "Game Over - Tap to restart";
+      statusEl.textContent = `Game Over - Max Combo: ${state.maxCombo}x - Tap to restart`;
     }
     ball.launched = false;
     ball.vx = 0;
@@ -201,9 +253,33 @@ function updateBall(dt) {
       ball.y - ball.radius < brick.y + brick.height
     ) {
       brick.alive = false;
-      state.score += 10;
+      
+      // Combo system
+      state.combo += 1;
+      if (state.combo > state.maxCombo) {
+        state.maxCombo = state.combo;
+      }
+      
+      // Calculate score with combo multiplier (increases every 3 hits)
+      const multiplier = Math.min(1 + Math.floor(state.combo / 3), 5);
+      const prevMultiplier = Math.min(1 + Math.floor((state.combo - 1) / 3), 5);
+      const points = brick.points * multiplier;
+      state.score += points;
       scoreEl.textContent = state.score;
-      spawnParticles(ball.x, ball.y, brick.hue);
+      
+      // Show combo text only when multiplier actually increases
+      if (multiplier > prevMultiplier && multiplier > 1) {
+        showComboText(ball.x, ball.y - 30, multiplier);
+      }
+      
+      // More particles for special bricks
+      const particleCount = brick.special ? 20 : 10;
+      spawnParticles(ball.x, ball.y, brick.hue, particleCount);
+      
+      // 15% chance to spawn power-up from special bricks
+      if (brick.special && Math.random() < 0.15) {
+        spawnPowerUp(brick.x + brick.width / 2, brick.y + brick.height / 2);
+      }
 
       const overlapX = Math.min(
         Math.abs(ball.x + ball.radius - brick.x),
@@ -250,9 +326,103 @@ function updateBall(dt) {
   }
 
   if (bricks.every((brick) => !brick.alive)) {
+    state.level += 1;
+    levelEl.textContent = state.level;
+    const newSpeed = calculateBallSpeed();
+    // Preserve active speed power-up effect
+    if (activePowerUps.speed) {
+      // Calculate current multiplier from previous level's base speed
+      const prevLevelSpeed = ball.baseSpeed + (state.level - 2) * LEVEL_SPEED_INCREMENT;
+      const currentMultiplier = ball.speed / prevLevelSpeed;
+      ball.speed = newSpeed * currentMultiplier;
+    } else {
+      ball.speed = newSpeed;
+    }
     buildBricks();
     ball.launched = false;
-    statusEl.textContent = "Stage Clear - Tap to continue";
+    statusEl.textContent = `Level ${state.level} - Tap to continue`;
+  }
+}
+
+function updatePowerUps(dt) {
+  for (let i = powerUps.length - 1; i >= 0; i -= 1) {
+    const powerUp = powerUps[i];
+    powerUp.y += powerUp.vy * dt;
+    
+    // Check collision with paddle
+    if (
+      powerUp.y + powerUp.radius >= paddle.y &&
+      powerUp.y - powerUp.radius <= paddle.y + paddle.height &&
+      powerUp.x + powerUp.radius >= paddle.x &&
+      powerUp.x - powerUp.radius <= paddle.x + paddle.width
+    ) {
+      applyPowerUp(powerUp.type);
+      spawnParticles(powerUp.x, powerUp.y, powerUp.hue, 15);
+      powerUps.splice(i, 1);
+      continue;
+    }
+    
+    // Remove if off screen
+    if (powerUp.y - powerUp.radius > state.height) {
+      powerUps.splice(i, 1);
+    }
+  }
+}
+
+function getDefaultPaddleWidth() {
+  return state.width < 720 ? state.width * 0.35 : state.width * 0.18;
+}
+
+function calculateBallSpeed() {
+  return ball.baseSpeed + (state.level - 1) * LEVEL_SPEED_INCREMENT;
+}
+
+function applyPowerUp(type) {
+  const MIN_PADDLE_WIDTH = 80;
+  const PADDLE_DURATION = 8000;
+  const SPEED_DURATION = 6000;
+  
+  switch (type) {
+    case 'expand':
+      if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
+      paddle.width = Math.min(getDefaultPaddleWidth() * POWER_UP_PADDLE_EXPAND, state.width * 0.4);
+      activePowerUps.paddle = setTimeout(() => {
+        paddle.width = getDefaultPaddleWidth();
+        activePowerUps.paddle = null;
+      }, PADDLE_DURATION);
+      break;
+    case 'shrink':
+      if (activePowerUps.paddle) clearTimeout(activePowerUps.paddle);
+      paddle.width = Math.max(getDefaultPaddleWidth() * POWER_UP_PADDLE_SHRINK, MIN_PADDLE_WIDTH);
+      activePowerUps.paddle = setTimeout(() => {
+        paddle.width = getDefaultPaddleWidth();
+        activePowerUps.paddle = null;
+      }, PADDLE_DURATION);
+      break;
+    case 'speedUp':
+      if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
+      ball.speed = calculateBallSpeed() * POWER_UP_SPEED_UP;
+      activePowerUps.speed = setTimeout(() => {
+        ball.speed = calculateBallSpeed();
+        activePowerUps.speed = null;
+      }, SPEED_DURATION);
+      break;
+    case 'slowDown':
+      if (activePowerUps.speed) clearTimeout(activePowerUps.speed);
+      ball.speed = calculateBallSpeed() * POWER_UP_SPEED_DOWN;
+      activePowerUps.speed = setTimeout(() => {
+        ball.speed = calculateBallSpeed();
+        activePowerUps.speed = null;
+      }, SPEED_DURATION);
+      break;
+  }
+}
+
+function updateComboText(dt) {
+  if (comboText.life > 0) {
+    comboText.life -= dt;
+    comboText.y -= 30 * dt;
+    comboText.scale = 1 + Math.sin(comboText.life * 8) * 0.1;
   }
 }
 
@@ -317,16 +487,63 @@ function drawBricks() {
   for (const brick of bricks) {
     if (!brick.alive) continue;
     const gradient = ctx.createLinearGradient(brick.x, brick.y, brick.x + brick.width, brick.y + brick.height);
-    gradient.addColorStop(0, `hsla(${brick.hue}, 80%, 65%, 0.9)`);
-    gradient.addColorStop(1, `hsla(${brick.hue}, 70%, 45%, 0.9)`);
+    
+    if (brick.special) {
+      gradient.addColorStop(0, `hsla(${brick.hue}, 90%, 70%, 0.95)`);
+      gradient.addColorStop(0.5, `hsla(${brick.hue + 10}, 85%, 60%, 0.95)`);
+      gradient.addColorStop(1, `hsla(${brick.hue}, 80%, 50%, 0.95)`);
+    } else {
+      gradient.addColorStop(0, `hsla(${brick.hue}, 80%, 65%, 0.9)`);
+      gradient.addColorStop(1, `hsla(${brick.hue}, 70%, 45%, 0.9)`);
+    }
 
     ctx.save();
-    ctx.shadowColor = `hsla(${brick.hue}, 80%, 60%, 0.8)`;
-    ctx.shadowBlur = 14;
+    ctx.shadowColor = `hsla(${brick.hue}, 80%, 60%, ${brick.special ? 1 : 0.8})`;
+    ctx.shadowBlur = brick.special ? 20 : 14;
     ctx.fillStyle = gradient;
     ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
     ctx.restore();
   }
+}
+
+function drawPowerUps(now) {
+  for (const powerUp of powerUps) {
+    ctx.save();
+    ctx.shadowColor = `hsla(${powerUp.hue}, 80%, 60%, 0.9)`;
+    ctx.shadowBlur = 16;
+    
+    // Draw pulsing circle
+    const pulse = 1 + Math.sin(now * 0.008) * 0.15;
+    ctx.fillStyle = `hsla(${powerUp.hue}, 85%, 65%, 0.9)`;
+    ctx.beginPath();
+    ctx.arc(powerUp.x, powerUp.y, powerUp.radius * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw symbol for power-up type
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const powerUpSymbols = { expand: 'W', shrink: '<', speedUp: '+', slowDown: '-' };
+    const symbol = powerUpSymbols[powerUp.type] || '?';
+    ctx.fillText(symbol, powerUp.x, powerUp.y);
+    ctx.restore();
+  }
+}
+
+function drawComboText() {
+  if (comboText.life <= 0) return;
+  
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, comboText.life);
+  ctx.shadowColor = 'rgba(255, 200, 100, 0.8)';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = 'rgba(255, 230, 150, 0.95)';
+  ctx.font = `bold ${Math.floor(24 * comboText.scale)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(comboText.text, comboText.x, comboText.y);
+  ctx.restore();
 }
 
 function drawParticles() {
@@ -372,17 +589,22 @@ function loop(timestamp) {
   if (!state.running) return;
   const dt = Math.min(0.02, (timestamp - state.lastTime) / 1000 || 0.016);
   state.lastTime = timestamp;
+  const now = Date.now();
 
   updatePaddle();
   updateBall(dt);
+  updatePowerUps(dt);
   updateParticles(dt);
+  updateComboText(dt);
 
   renderBackground();
   drawBricks();
   drawTitle();
   drawPaddle();
   drawBall();
+  drawPowerUps(now);
   drawParticles();
+  drawComboText();
 
   requestAnimationFrame(loop);
 }
